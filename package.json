@@ -1,16 +1,16 @@
 {
-  "name": "express-hello-world",
+  "name": "ticket-server",
   "version": "1.0.0",
-  "description": "Express Hello World on Render",
+  "description": "Express Ticket Server on Render",
   "main": "app.js",
-  "repository": "https://github.com/render-examples/express-hello-world",
+  "repository": "https://github.com/ruchithams/ticket-server",
   "author": "Render Developers",
-  "license": "MIT",
   "private": false,
   "scripts": {
     "start": "node app.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.40.0",
     "express": "^4.18.2"
   },
   "engines": {

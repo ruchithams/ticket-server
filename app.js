@@ -1,14 +1,12 @@
 const express = require("express");
 const app = express();
 const port = process.env.PORT || 3001;
-const { TicketStatus } = require('./enums');
+const { TicketStatus } = require('./enum');
 // Import dbUtils module
-const { ensureTicketsTableExists, insertTicketData, getRecentTicketData } = require('./dbUtils');
+const { ensureTicketsTableExists, insertTicketData, getAllTickets, updateTicketData } = require('./dbUtils');
 
 // Call the function to ensure the 'tickets' table exists
 ensureTicketsTableExists();
-
-app.get("/", (req, res) => res.type('html').send(html));
 
 // Route to handle POST requests to save ticket data
 app.post('/api/ticket', async (req, res) => {
@@ -20,9 +18,23 @@ app.post('/api/ticket', async (req, res) => {
 
         res.status(201).json({ message: 'Ticket data saved successfully', data });
     } catch (error) {
-        console.error('Error saving ticket data:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error creating ticket:', error.message);
+        res.status(500).json({ error: 'Error saving ticket data' });
     }
+});
+
+// Route to handle GET requests to fetch all tickets
+app.get('/api/tickets', async (req, res) => {
+  try {
+      // Fetch all tickets using the utility function
+      const tickets = await getAllTickets();
+
+      // Respond with the fetched tickets
+      res.json(tickets);
+  } catch (error) {
+      console.error('Error fetching tickets:', error.message);
+      res.status(500).json({ error: 'Failed to fetch tickets' });
+  }
 });
 
 // Route to handle PUT requests to update ticket data
@@ -48,17 +60,7 @@ app.put('/api/ticket/:id', async (req, res) => {
           return res.status(400).json({ error: 'Ticket response is required for resolved status' });
       }
 
-      // Create a new ticket entry with updated status, response
-      const newTicketData = {
-          username: existingTicket.username,
-          email: existingTicket.email,
-          ticketDescription: existingTicket.ticketDescription,
-          ticketStatus,
-          ticketResponse, // Include ticketResponse in the updated data
-          createdAt: existingTicket.createdAt,
-          updatedAt
-      };
-      const updatedTicket = await insertTicketData(newTicketData);
+      const updatedTicket = await updateTicketData(id, ticketResponse, ticketStatus);
 
       // If the ticket is resolved and a response is provided, send an email
       if (ticketStatus === TicketStatus.RESOLVED.toString()) {
@@ -70,7 +72,7 @@ app.put('/api/ticket/:id', async (req, res) => {
       res.json({ message: 'Ticket status updated successfully', data: updatedTicket });
   } catch (error) {
       console.error('Error updating ticket status:', error.message);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: 'Failed to update ticket, please try again.' });
   }
 });
 

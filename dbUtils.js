@@ -1,40 +1,46 @@
-const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const {randomUUID} = require("crypto");
 const { TicketStatus } = require('./enum');
-//const { v4: uuidv4 } = require('uuid');
-//import { createClient } from '@supabase/supabase-js'
 
 // Initialize Superbase client
 const supabaseUrl = 'https://bvggckvgzswzaiizfwap.supabase.co'
-const supabaseKey = process.env.SUPABASE_KEY
+//const supabaseKey = process.env.SUPABASE_KEY
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2Z2dja3ZnenN3emFpaXpmd2FwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTE0MDg0ODgsImV4cCI6MjAyNjk4NDQ4OH0.0QQHd0ks8OZKsFt4UCOlWoCkiHK7TUU9zQ7qgdWtiPk'
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Function to ensure the 'tickets' table exists
+//Function to ensure the 'tickets' table exists
 async function ensureTicketsTableExists() {
     try {
         const { error } = await supabase
             .from('tickets')
             .select('*')
             .limit(1); // Attempt to select a record from the 'tickets' table
-            
-        if (error && error.code === '42P01') {
-            // If the table doesn't exist, create it
-            await supabase.from('tickets').create({
-                id: { type: 'uuid', primary: true, default: 'randomUUID()' },
-                username: { type: 'text' },
-                email: { type: 'text' },
-                ticketDescription: { type: 'text' },
-                ticketResponse: { type: 'text' },
-                ticketStatus: { type: 'text', default: 'new' },
-                createdAt: { type: 'timestamp with time zone', default: 'now()' },
-                updatedAt: { type: 'timestamp with time zone', default: 'now()' }
-            });
-            console.log('Tickets table created successfully');
+
+        // TODO: Not sure why create table is not supported by supbase library. Created table by running the query using CLI tool on the supbase client.    
+        if (false && error && error.code === '42P01') {
+            const { error } = await supabase
+            .from('tickets') // Replace 'tickets' with the desired table name
+            .sql(`
+                CREATE TABLE tickets (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    username TEXT,
+                    email TEXT,
+                    ticketDescription TEXT,
+                    ticketResponse TEXT,
+                    ticketStatus TEXT DEFAULT 'new',
+                    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+            `);
+
+            if (error) {
+                throw error;
+            }
+
+            console.log('Ticket table created successfully');
         }
     } catch (error) {
-        console.error('Error ensuring tickets table exists:', error.message);
-        throw error;
+        console.error('Error creating ticket table:', error.message);
     }
 }
 
@@ -42,11 +48,11 @@ async function ensureTicketsTableExists() {
 async function insertTicketData(username, email, ticketDescription, id = null, createdAt = null, ticketStatus = TicketStatus.NEW.toString()) {
     try {
         //ID is null when ticket is created for the first time.
-        if(id == null)
-        {
-            id = randomUUID(); // Generate UUID for the ticket
-            //id = uuidv4(); // Generate UUID for the ticket
-        }
+        // if(id == null)
+        // {
+        //     id = randomUUID(); // Generate UUID for the ticket
+        //     //id = uuidv4(); // Generate UUID for the ticket
+        // }
 
         const updatedAt = new Date().toISOString(); // Current timestamp of updation
         if(ticketStatus == TicketStatus.NEW.toString() && createdAt == null) {
@@ -54,35 +60,52 @@ async function insertTicketData(username, email, ticketDescription, id = null, c
         } 
         const { data, error } = await supabase
             .from('tickets')
-            .insert([{ id, username, email, ticketDescription, ticketResponse, ticketStatus, createdAt, updatedAt }]);
-
-        if (error) {
-            throw error;
-        }
+            .insert([{ username, email, ticketDescription, ticketResponse, ticketStatus, createdAt, updatedAt }]);
 
         return { data };
     } catch (error) {
-        throw error;
+        console.error('Error creating ticket:', error.message);
+        res.status(500).json({ error: 'Failed to create ticket' });
     }
 }
 
-// Function to fetch the most recent ticket data from the database
-async function getRecentTicketData() {
+// Function to insert ticket data into Superbase database
+async function updateTicketData(id, ticketStatus, ticketResponse) {
     try {
-        const { data: recentTicket, error } = await supabase
+
+       // Construct the updated ticket data object
+       const updatedTicketData = {
+            ticketStatus,
+            ticketResponse,
+            updatedAt: new Date().toISOString() // Update the 'updatedAt' field with current timestamp
+        };
+
+        // Perform the update operation using Supabase client
+        const { data: updatedTicket, error } = await supabase
             .from('tickets')
-            .select('*')
-            .order('updatedAt', { ascending: false })
-            .single();
+            .update(updatedTicketData)
+            .eq('id', id)
+            .single(); 
 
-        if (error) {
-            throw error;
-        }
-
-        return recentTicket;
+        // Respond with the updated ticket data
+        res.json({ message: 'Ticket updated successfully', data: updatedTicket });
     } catch (error) {
-        throw error;
+        console.error('Error updating ticket:', error.message);
+        res.status(500).json({ error: 'Failed to update ticket' });
     }
 }
 
-module.exports = {ensureTicketsTableExists, insertTicketData, getRecentTicketData};
+async function getAllTickets() {
+    try {
+        const { data, error } = await supabase
+            .from('tickets')
+            .select('*');
+
+        return data;
+    } catch (error) {
+        console.error('Error fetching tickets:', error.message);
+        res.status(500).json({ error: 'Failed to fetch tickets' });
+    }
+}
+
+module.exports = {ensureTicketsTableExists, insertTicketData, updateTicketData, getAllTickets};
