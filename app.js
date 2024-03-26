@@ -1,61 +1,78 @@
 const express = require("express");
 const app = express();
 const port = process.env.PORT || 3001;
+const { TicketStatus } = require('./enums');
+// Import dbUtils module
+const { ensureTicketsTableExists, insertTicketData, getRecentTicketData } = require('./dbUtils');
+
+// Call the function to ensure the 'tickets' table exists
+ensureTicketsTableExists();
 
 app.get("/", (req, res) => res.type('html').send(html));
 
-const server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+// Route to handle POST requests to save ticket data
+app.post('/api/ticket', async (req, res) => {
+    try {
+        const { username, email, ticketDescription, ticketStatus } = req.body.ticketRequest;
 
-server.keepAliveTimeout = 120 * 1000;
-server.headersTimeout = 120 * 1000;
+        // Insert ticket data into Superbase database
+        const { data } = await insertTicketData(username, email, ticketDescription, ticketStatus);
 
-const html = `
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Hello from Render!</title>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
-    <script>
-      setTimeout(() => {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-          disableForReducedMotion: true
-        });
-      }, 500);
-    </script>
-    <style>
-      @import url("https://p.typekit.net/p.css?s=1&k=vnd5zic&ht=tk&f=39475.39476.39477.39478.39479.39480.39481.39482&a=18673890&app=typekit&e=css");
-      @font-face {
-        font-family: "neo-sans";
-        src: url("https://use.typekit.net/af/00ac0a/00000000000000003b9b2033/27/l?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n7&v=3") format("woff2"), url("https://use.typekit.net/af/00ac0a/00000000000000003b9b2033/27/d?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n7&v=3") format("woff"), url("https://use.typekit.net/af/00ac0a/00000000000000003b9b2033/27/a?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n7&v=3") format("opentype");
-        font-style: normal;
-        font-weight: 700;
+        res.status(201).json({ message: 'Ticket data saved successfully', data });
+    } catch (error) {
+        console.error('Error saving ticket data:', error.message);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Route to handle PUT requests to update ticket data
+app.put('/api/ticket/:id', async (req, res) => {
+  try {
+      const { id } = req.params;
+      const { ticketStatus, ticketResponse } = req.body;
+
+      // Fetch the existing ticket data
+      const existingTicket = await getTicketData(id);
+
+      if (!existingTicket) {
+          return res.status(404).json({ error: 'Ticket not found' });
       }
-      html {
-        font-family: neo-sans;
-        font-weight: 700;
-        font-size: calc(62rem / 16);
+
+      // Check if the ticket is already resolved
+      if (existingTicket.ticketStatus === TicketStatus.RESOLVED.toString()) {
+          return res.status(400).json({ error: 'Ticket is already resolved, please open a new ticket' });
       }
-      body {
-        background: white;
+
+      // Check if the ticket status is being set to resolved
+      if (ticketStatus === TicketStatus.RESOLVED.toString() && !ticketResponse) {
+          return res.status(400).json({ error: 'Ticket response is required for resolved status' });
       }
-      section {
-        border-radius: 1em;
-        padding: 1em;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        margin-right: -50%;
-        transform: translate(-50%, -50%);
+
+      // Create a new ticket entry with updated status, response
+      const newTicketData = {
+          username: existingTicket.username,
+          email: existingTicket.email,
+          ticketDescription: existingTicket.ticketDescription,
+          ticketStatus,
+          ticketResponse, // Include ticketResponse in the updated data
+          createdAt: existingTicket.createdAt,
+          updatedAt
+      };
+      const updatedTicket = await insertTicketData(newTicketData);
+
+      // If the ticket is resolved and a response is provided, send an email
+      if (ticketStatus === TicketStatus.RESOLVED.toString()) {
+          console.log(`Email with response (${ticketResponse}) is sent to the user (${existingTicket.email}) who created the ticket.`);
+          // Logic to send email (replace with actual implementation)
+          // Example: sendEmail(existingTicket.email, 'Ticket Response', ticketResponse);
       }
-    </style>
-  </head>
-  <body>
-    <section>
-      Hello from Render!
-    </section>
-  </body>
-</html>
-`
+
+      res.json({ message: 'Ticket status updated successfully', data: updatedTicket });
+  } catch (error) {
+      console.error('Error updating ticket status:', error.message);
+      res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+const server = app.listen(port, () => console.log(`Ticket Server listening on port ${port}!`));
