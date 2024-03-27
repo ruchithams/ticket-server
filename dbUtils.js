@@ -105,7 +105,7 @@ async function getAllTickets() {
     try {
         const { data, error } = await supabase
             .from('tickets')
-            .select(*);
+            .select('*');
 
         return data;
     } catch (error) {
