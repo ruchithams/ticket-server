@@ -105,7 +105,7 @@ async function getAllTickets() {
     try {
         const { data, error } = await supabase
             .from('tickets')
-            .select('username', 'email', 'description', 'response', 'createdat', 'updatedat','status');
+            .select(*);
 
         return data;
     } catch (error) {
