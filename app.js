@@ -36,13 +36,7 @@ app.get('/api/tickets', async (req, res) => {
       const tickets = await getAllTickets();
 
       // Respond with the fetched tickets
-      res.json({username: tickets.username, 
-        email: tickets.email, 
-        description: tickets.description, 
-        response: tickets.response, 
-        createdat: tickets.createdat, 
-        updatedat: tickets.updatedat, 
-        status:tickets.status});
+      res.json(tickets);
   } catch (error) {
       console.error('Error fetching tickets:', error.message);
       res.status(500).json({ error: 'Failed to fetch tickets' });
