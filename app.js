@@ -1,9 +1,13 @@
 const express = require("express");
 const app = express();
+// Enable CORS for all routes
+const cors = require('cors');
+app.use(cors()) 
+
 const port = process.env.PORT || 3001;
 const { TicketStatus } = require('./enum');
 // Import dbUtils module
-const { ensureTicketsTableExists, insertTicketData, getAllTickets, updateTicketData } = require('./dbUtils');
+const { ensureTicketsTableExists, insertTicketData, getAllTickets, updateTicketData, getTicketData } = require('./dbUtils');
 
 // Call the function to ensure the 'tickets' table exists
 ensureTicketsTableExists();
@@ -11,12 +15,13 @@ ensureTicketsTableExists();
 // Route to handle POST requests to save ticket data
 app.post('/api/ticket', async (req, res) => {
     try {
-        const { username, email, ticketDescription, ticketStatus } = req.body.ticketRequest;
+        console.log('entering api ticket');
+        const { username, email, description} = req.body;
 
         // Insert ticket data into Superbase database
-        const { data } = await insertTicketData(username, email, ticketDescription, ticketStatus);
+        await insertTicketData(username, email, description);
 
-        res.status(201).json({ message: 'Ticket data saved successfully', data });
+        res.status(201).json({ message: 'Ticket data saved successfully'});
     } catch (error) {
         console.error('Error creating ticket:', error.message);
         res.status(500).json({ error: 'Error saving ticket data' });
@@ -38,10 +43,9 @@ app.get('/api/tickets', async (req, res) => {
 });
 
 // Route to handle PUT requests to update ticket data
-app.put('/api/ticket/:id', async (req, res) => {
+app.put('/api/update-ticket', async (req, res) => {
   try {
-      const { id } = req.params;
-      const { ticketStatus, ticketResponse } = req.body;
+      const { id, status, response } = req.body;
 
       // Fetch the existing ticket data
       const existingTicket = await getTicketData(id);
@@ -51,25 +55,24 @@ app.put('/api/ticket/:id', async (req, res) => {
       }
 
       // Check if the ticket is already resolved
-      if (existingTicket.ticketStatus === TicketStatus.RESOLVED.toString()) {
+      if (existingTicket.status === TicketStatus.RESOLVED.toString()) {
           return res.status(400).json({ error: 'Ticket is already resolved, please open a new ticket' });
       }
 
       // Check if the ticket status is being set to resolved
-      if (ticketStatus === TicketStatus.RESOLVED.toString() && !ticketResponse) {
+      if (status === TicketStatus.RESOLVED.toString() && !response) {
           return res.status(400).json({ error: 'Ticket response is required for resolved status' });
       }
 
-      const updatedTicket = await updateTicketData(id, ticketResponse, ticketStatus);
+      await updateTicketData(id, response, status);
 
       // If the ticket is resolved and a response is provided, send an email
-      if (ticketStatus === TicketStatus.RESOLVED.toString()) {
-          console.log(`Email with response (${ticketResponse}) is sent to the user (${existingTicket.email}) who created the ticket.`);
+      if (status === TicketStatus.RESOLVED.toString()) {
+          console.log(`Email with response (${response}) is sent to the user (${existingTicket.email}) who created the ticket.`);
           // Logic to send email (replace with actual implementation)
-          // Example: sendEmail(existingTicket.email, 'Ticket Response', ticketResponse);
       }
 
-      res.json({ message: 'Ticket status updated successfully', data: updatedTicket });
+      res.json({ message: 'Ticket status updated successfully'});
   } catch (error) {
       console.error('Error updating ticket status:', error.message);
       res.status(500).json({ error: 'Failed to update ticket, please try again.' });

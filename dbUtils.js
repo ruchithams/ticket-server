@@ -25,8 +25,8 @@ async function ensureTicketsTableExists() {
                     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                     username TEXT,
                     email TEXT,
-                    ticketDescription TEXT,
-                    ticketResponse TEXT,
+                    description TEXT,
+                    response TEXT,
                     ticketStatus TEXT DEFAULT 'new',
                     createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                     updatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -45,24 +45,18 @@ async function ensureTicketsTableExists() {
 }
 
 // Function to insert ticket data into Superbase database
-async function insertTicketData(username, email, ticketDescription, id = null, createdAt = null, ticketStatus = TicketStatus.NEW.toString()) {
+async function insertTicketData(username, email, description) {
     try {
-        //ID is null when ticket is created for the first time.
-        // if(id == null)
-        // {
-        //     id = randomUUID(); // Generate UUID for the ticket
-        //     //id = uuidv4(); // Generate UUID for the ticket
-        // }
-
-        const updatedAt = new Date().toISOString(); // Current timestamp of updation
-        if(ticketStatus == TicketStatus.NEW.toString() && createdAt == null) {
-            createdAt = updatedAt
-        } 
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('tickets')
-            .insert([{ username, email, ticketDescription, ticketResponse, ticketStatus, createdAt, updatedAt }]);
+            .insert([{ 
+                username: username, 
+                email: email, 
+                description: description, 
+                response: null, 
+                status: TicketStatus.NEW.toString()}]);
 
-        return { data };
+        return;
     } catch (error) {
         console.error('Error creating ticket:', error.message);
         res.status(500).json({ error: 'Failed to create ticket' });
@@ -70,28 +64,42 @@ async function insertTicketData(username, email, ticketDescription, id = null, c
 }
 
 // Function to insert ticket data into Superbase database
-async function updateTicketData(id, ticketStatus, ticketResponse) {
+async function updateTicketData(id, status, response) {
     try {
-
-       // Construct the updated ticket data object
-       const updatedTicketData = {
-            ticketStatus,
-            ticketResponse,
-            updatedAt: new Date().toISOString() // Update the 'updatedAt' field with current timestamp
-        };
-
         // Perform the update operation using Supabase client
-        const { data: updatedTicket, error } = await supabase
+        const {error} = await supabase
             .from('tickets')
-            .update(updatedTicketData)
-            .eq('id', id)
-            .single(); 
+            .update({
+                status: status,
+                response: response,
+                updatedat:((new Date()).toISOString()).toLocaleString('zh-TW')
+            })
+            .eq('id', id);
 
+        if(error){
+            throw error;
+        }
         // Respond with the updated ticket data
-        res.json({ message: 'Ticket updated successfully', data: updatedTicket });
+        return;
     } catch (error) {
         console.error('Error updating ticket:', error.message);
         res.status(500).json({ error: 'Failed to update ticket' });
+    }
+}
+
+
+async function getTicketData(id) {
+    try {
+        const { data, error } = await supabase
+        .from('tickets')
+        .select()
+        .eq('id', id)
+        .single();
+
+        return data;
+    } catch (error) {
+        console.error('Error fetching ticket:', error.message);
+        res.status(500).json({ error: 'Failed to fetch ticket' });
     }
 }
 
@@ -108,4 +116,4 @@ async function getAllTickets() {
     }
 }
 
-module.exports = {ensureTicketsTableExists, insertTicketData, updateTicketData, getAllTickets};
+module.exports = {ensureTicketsTableExists, insertTicketData, updateTicketData, getAllTickets, getTicketData};
