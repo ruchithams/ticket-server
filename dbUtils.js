@@ -1,11 +1,9 @@
 const { createClient } = require('@supabase/supabase-js');
-const {randomUUID} = require("crypto");
 const { TicketStatus } = require('./enum');
 
 // Initialize Superbase client
 const supabaseUrl = 'https://bvggckvgzswzaiizfwap.supabase.co'
-//const supabaseKey = process.env.SUPABASE_KEY
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2Z2dja3ZnenN3emFpaXpmd2FwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTE0MDg0ODgsImV4cCI6MjAyNjk4NDQ4OH0.0QQHd0ks8OZKsFt4UCOlWoCkiHK7TUU9zQ7qgdWtiPk'
+const supabaseKey = process.env.SUPABASE_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 //Function to ensure the 'tickets' table exists
@@ -15,7 +13,6 @@ async function ensureTicketsTableExists() {
             .from('tickets')
             .select('*')
             .limit(1); // Attempt to select a record from the 'tickets' table
-
         // TODO: Not sure why create table is not supported by supbase library. Created table by running the query using CLI tool on the supbase client.    
         if (false && error && error.code === '42P01') {
             const { error } = await supabase
@@ -55,7 +52,10 @@ async function insertTicketData(username, email, description) {
                 description: description, 
                 response: null, 
                 status: TicketStatus.NEW.toString()}]);
-
+        
+        if(error) {
+            throw error;
+        }
         return;
     } catch (error) {
         console.error('Error creating ticket:', error.message);
@@ -66,7 +66,6 @@ async function insertTicketData(username, email, description) {
 // Function to insert ticket data into Superbase database
 async function updateTicketData(id, status, response) {
     try {
-        // Perform the update operation using Supabase client
         const {error} = await supabase
             .from('tickets')
             .update({
@@ -79,7 +78,6 @@ async function updateTicketData(id, status, response) {
         if(error){
             throw error;
         }
-        // Respond with the updated ticket data
         return;
     } catch (error) {
         console.error('Error updating ticket:', error.message);
